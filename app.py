@@ -63,10 +63,6 @@ def upload_csv():
             return f"Error processing CSV: {e}", 500
     else:
         return "Invalid file type. Please upload a CSV file.", 400
-    
-@app.route("/")
-def index():
-    return render_template("index.html")
 
 
 @app.route("/data")
