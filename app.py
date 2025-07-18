@@ -63,6 +63,11 @@ def upload_csv():
             return f"Error processing CSV: {e}", 500
     else:
         return "Invalid file type. Please upload a CSV file.", 400
+    
+@app.route("/")
+def index():
+    return render_template("index.html")
+
 
 @app.route("/data")
 def get_data():
@@ -152,7 +157,7 @@ def get_data():
 
 if __name__ == "__main__":
     import os
-
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=False)
+
 
