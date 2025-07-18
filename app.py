@@ -6,7 +6,7 @@ import io # Import io module for in-memory file handling
 
 app = Flask(__name__)
 
-uploaded_df = None
+uploaded_dfs = {}  # key = IP address, value = DataFrame
 
 # Moving average
 def add_trendlines(data, window=5):
@@ -22,7 +22,7 @@ def index():
 
 @app.route("/upload_csv", methods=["POST"])
 def upload_csv():
-    global uploaded_df # Declare that we are modifying the global variable
+    ip = request.remote_addr
 
     if "csv_file" not in request.files:
         return "No file part", 400
@@ -34,46 +34,39 @@ def upload_csv():
     
     if file and file.filename.endswith(".csv"):
         try:
-            # Read the file into a Pandas DataFrame
-            # Use io.StringIO to read the file content as a string
             file_content = io.StringIO(file.read().decode('utf-8'))
             df = pd.read_csv(file_content)
             
-            # Apply the same initial processing as the default data
             df.columns = [col.strip() for col in df.columns]
 
-            # Robust timestamp handling
             if "Date" in df.columns and "Time" in df.columns:
                 df["Timestamp"] = pd.to_datetime(df["Date"] + " " + df["Time"]).dt.tz_localize("Asia/Jakarta")
-                df = df.drop(columns=["Date", "Time"], errors='ignore') # Drop original Date and Time columns
+                df = df.drop(columns=["Date", "Time"], errors='ignore')
             elif "Timestamp" in df.columns:
-                # If 'Timestamp' column exists, try to convert it
                 df["Timestamp"] = pd.to_datetime(df["Timestamp"])
             else:
-                # Fallback: create a dummy Timestamp if no suitable columns are found
-                df["Timestamp"] = pd.to_datetime(pd.Series(range(len(df))), unit='s') # Placeholder timestamp
+                df["Timestamp"] = pd.to_datetime(pd.Series(range(len(df))), unit='s')
             
-            # Ensure Timestamp is the first column
             cols = ['Timestamp'] + [col for col in df.columns if col != 'Timestamp']
             df = df[cols]
 
-            uploaded_df = df # Store the processed DataFrame globally
-            return redirect(url_for("index")) # Redirect back to the dashboard
+            uploaded_dfs[ip] = df  # Save per-IP
+            return redirect(url_for("index"))
         except Exception as e:
             return f"Error processing CSV: {e}", 500
     else:
         return "Invalid file type. Please upload a CSV file.", 400
 
 
+
 @app.route("/data")
 def get_data():
-    global uploaded_df
-    
-    
-    if uploaded_df is None:
+    ip = request.remote_addr
+
+    if ip not in uploaded_dfs:
         return jsonify({"error": "No CSV file has been uploaded yet."}), 400
 
-    current_df = uploaded_df.copy()
+    current_df = uploaded_dfs[ip].copy()
 
     time_range = request.args.get("time_range", "all")
     time_interval_str = request.args.get("time_interval", "0")
